@@ -1,4 +1,4 @@
-import Axios, {AxiosBasicCredentials, AxiosResponse, AxiosError, AxiosRequestConfig} from 'axios'
+import Axios, {AxiosBasicCredentials, AxiosResponse, AxiosError, AxiosRequestConfig, CancelTokenSource} from 'axios'
 import { Agent as HttpsAgent } from 'https'
 import { Agent as HttpAgent } from 'http'
 import { EventEmitter } from 'events'
@@ -29,6 +29,7 @@ class DahuaEvents {
     public RECONNECTING_EVENT_NAME: string = 'reconnecting'
 
     private host:                   string
+    private source:                 CancelTokenSource
 
     constructor(host: string, user: string, pass: string, useHttp: boolean) {
         this.host = host
@@ -36,6 +37,8 @@ class DahuaEvents {
             username: user,
             password: pass
         }
+        const CancelToken = Axios.CancelToken;
+        this.source = CancelToken.source();
 
         let keepAliveAgent;
 
@@ -68,7 +71,8 @@ class DahuaEvents {
             headers: this.HEADERS,
             method: 'GET',
             responseType: 'stream',
-            timeout: 30000
+            timeout: 30000,
+            cancelToken: this.source.token
         }
 
         this.eventEmitter = new EventEmitter()
@@ -149,6 +153,7 @@ class DahuaEvents {
     
     private reconnect = (axiosRequestConfig: AxiosRequestConfig, reconnection_interval_ms: number) => {
         //reconnect after 30s
+        this.source.cancel('Operation canceled by the user.');
         this.eventEmitter.emit(this.RECONNECTING_EVENT_NAME, `Reconnecting in ${reconnection_interval_ms/1000}s.`)
         setTimeout(() => {
             this.connect(axiosRequestConfig, 0)
